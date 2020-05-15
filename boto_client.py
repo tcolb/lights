@@ -26,31 +26,6 @@ def handle_message(msg):
     elif msg.startswith("tap"):
         easeMatrixBlink()
 
-def recving():
-    response = sqs.receieve_message(
-        QueueUrl=receive_url,
-        AttributeNames=[
-            'SentTimestamp'
-        ],
-        MaxNumberOfMessages=1,
-        MessageAttributeNames=[
-            'All'
-        ],
-        VisibilityTimeout=0,
-        WaitTimeSeconds=0
-    )
-
-    message = response['Messages'][0]
-    receipt_handle = message['ReceiptHandle']
-
-    handle_message(message)
-
-    sqs.delete_message(
-            QueueUrl=receieve_url,
-            ReceiptHandle = receipt_handle
-    )
-
-
 def send_message(tapped, accel):
     response = sqs.send_message(
         QueueUrl=send_url,
@@ -103,6 +78,7 @@ def eased_matrix_blink():
     ease_out_matrix(ease_in_expo)
 
 def sending():
+    print("Started recving thread.")
     accel_threshold = 10
     while True:
         tapped = msa.tapped
@@ -111,7 +87,33 @@ def sending():
             send_message(tapped, accel)
             time.sleep(1) # delay for placing back down, maybe better way to do this
 
-def __main__():
+def recving():
+    print("Started recving thread.")
+    while True:
+        response = sqs.receieve_message(
+            QueueUrl=receive_url,
+            AttributeNames=[
+                'SentTimestamp'
+            ],
+            MaxNumberOfMessages=1,
+            MessageAttributeNames=[
+                'All'
+            ],
+            VisibilityTimeout=0,
+            WaitTimeSeconds=0
+        )
+
+        message = response['Messages'][0]
+        receipt_handle = message['ReceiptHandle']
+
+        handle_message(message)
+
+        sqs.delete_message(
+                QueueUrl=receieve_url,
+                ReceiptHandle = receipt_handle
+        )
+
+if __name__ == "__main__":
     # setup aws sqs
     sqs = boto3.client('sqs')
     base_sqs_url = "https://sqs.us-west-1.amazonaws.com/197553793325/light_"
