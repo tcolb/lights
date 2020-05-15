@@ -78,7 +78,7 @@ def eased_matrix_blink():
     ease_out_matrix(ease_in_expo)
 
 def sending():
-    print("Started recving thread.")
+    print("Hello from recving thread.")
     accel_threshold = 10
     while True:
         tapped = msa.tapped
@@ -88,9 +88,9 @@ def sending():
             time.sleep(1) # delay for placing back down, maybe better way to do this
 
 def recving():
-    print("Started recving thread.")
+    print("Hello from recving thread.")
     while True:
-        response = sqs.receieve_message(
+        response = sqs.receive_message(
             QueueUrl=receive_url,
             AttributeNames=[
                 'SentTimestamp'
@@ -103,15 +103,16 @@ def recving():
             WaitTimeSeconds=0
         )
 
-        message = response['Messages'][0]
-        receipt_handle = message['ReceiptHandle']
+        if 'Messages' in response:
+            message = response['Messages'][0]
+            receipt_handle = message['ReceiptHandle']
 
-        handle_message(message)
+            handle_message(message)
 
-        sqs.delete_message(
-                QueueUrl=receieve_url,
-                ReceiptHandle = receipt_handle
-        )
+            sqs.delete_message(
+                    QueueUrl=receieve_url,
+                    ReceiptHandle = receipt_handle
+            )
 
 if __name__ == "__main__":
     # setup aws sqs
@@ -130,8 +131,8 @@ if __name__ == "__main__":
     send_thread = threading.Thread(target=sending)
     recv_thread = threading.Thread(target=recving)
 
-    send_thread.start()
+    #send_thread.start()
     recv_thread.start()
 
-    send_thread.join()
+    #send_thread.join()
     recv_thread.join()
