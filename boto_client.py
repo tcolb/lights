@@ -1,9 +1,10 @@
-import boto3, os, threading, multiprocessing
+import boto3, os
+from multiprocessing import Process
 import awsconfig
 
 import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
-from adafruit_is31fl3731 import Matrix, CharlieBonnet, CharlieWing
+from adafruit_is31fl3731 import CharlieWing
 
 
 DEBUG = True
