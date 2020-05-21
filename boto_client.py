@@ -4,7 +4,7 @@ import awsconfig
 
 import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
-from adafruit_is31fl3731 import CharlieWing
+from adafruit_is31fl3731 import CharlieBonnet
 
 
 DEBUG = True
@@ -19,9 +19,6 @@ elif HIMST:
 else:
     receive_suffix = "her"
     send_suffix = "him"
-
-current_recvs = 0
-message_lock = threading.Lock()
 
 def send_message(tapped, accel):
     response = sqs.send_message(
