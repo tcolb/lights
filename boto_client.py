@@ -57,7 +57,7 @@ def ease_in_expo(x):
 
 max_brightness = 100
 ease_step = 0.05
-ease_wait = 0.05
+ease_wait = 0.01
 def ease_in_matrix(ease_func):
     progress = 0.0
     while progress <= 1:
