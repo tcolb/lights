@@ -5,10 +5,7 @@ import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
 from adafruit_is31fl3731 import Matrix
 
-
 # accel is in m/s^2
-#VEC_MAG_MIN = 3.224212470756315
-VEC_MAG_MIN = 11
 
 DEBUG = True
 HIMST = True
@@ -27,7 +24,6 @@ MQTT_SERVER = "44.227.84.62" # amazon ec2 instance elastic ip
 MQTT_SUB_PATH = "lovelight/from" + SUB_GEN
 MQTT_PUB_PATH = "lovelight/from" + PUB_GEN
 
-
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
     client.subscribe(MQTT_SUB_PATH)
@@ -36,62 +32,75 @@ def on_message(client, userdata, msg):
     msg_str = msg.payload.decode('ascii')
     print("debug", msg_str)
     if msg_str.startswith("acc"):
-        display.fill(5)
-        time.sleep(0.2)
-        display.fill(0)
+        easedMatrixBlink()
     elif msg_str.startswith("tap"):
-        display.fill(5)
-        time.sleep(0.2)
-        display.fill(0)
+        easeMatrixBlink()
     else:
         print(msg.topic + " " + str(msg.payload))
+    time.sleep(0.5)
 
-def publish_test_message(client):
+def publishTestMessage(client):
     client.publish(MQTT_PUB_PATH, "hello from python!", qos=0, retain=False)
 
-def publish_accel(client, accel):
+def publishAccel(client, accel):
     client.publish(MQTT_PUB_PATH, "acc %d %d %d" % (accel[0], accel[1], accel[2]), qos=0, retain=False)
 
-def publish_tap(client):
+def publishTap(client):
     client.publish(MQTT_PUB_PATH, "tap", qos=0, retain=False)
 
-def calc_euc2_dist(u, v):
-    return ((u[0] - v[0])**2 + (u[1] - v[1])**2 + (u[2] - v[2])**2)
+# input is from 0 - 1 representing percentage of animation
+def easeInExpo(x):
+    if x == 0:
+        return 0
+    else:
+        return 2 ** (10 * x - 10)
 
-def calc_vec_mag(v):
-    return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+maxBrightness = 100
+easeStep = 0.05
+def easeInMatrix(easeFunc):
+    progress = 0.0
+    while progress <= 1:
+        display.fill(maxBrightness * easeFunc(progress))
+        progress += easeStep
 
+def easeOutMatrix(easeFunc):
+    progress = 1.0
+    while True:
+        if progress <= 0:
+            display.fill(0)
+            return
+        display.fill(maxBrightness * easeFunc(progress))
+        progress -= easeStep
+
+def easedMatrixBlink():
+    easeInMatrix(easeInExpo)
+    easeOutMatrix(easeInExpo)
+
+# setup mqtt
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
-
 client.connect(MQTT_SERVER, 1883, 60)
-
 client.loop_start()
 
-
+# init matrix and acceleromterer
 i2c = busio.I2C(board.SCL, board.SDA)
 display = Matrix(i2c)
 msa = MSA301(i2c)
 msa.enable_tap_detection()
 
-
-vcur = (0,0,0)
-vprev = (0,0,0)
+# main loop
+accel_threshold = 10
 while(True):
-    vcur = msa.acceleration
-    print(calc_vec_mag(vcur))
-    enough_accel = calc_vec_mag(vcur) > VEC_MAG_MIN
-
-    if enough_accel:
+    accel = msa.acceleration
+    
+    if accel > accel_threshold:
         publish_accel(client, vcur)
         time.sleep(1) # delay for placing back down, maybe better way to do this
 
     if msa.tapped:
         publish_tap(client)
 
-    vprev = vcur
     time.sleep(0.1)
-
 
 client.loop_stop(force=False)
