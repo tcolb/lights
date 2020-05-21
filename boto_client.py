@@ -1,9 +1,9 @@
-import boto3
-import threading
+import boto3, os, threading
+import awsconfig
 
 import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
-from adafruit_is31fl3731 import Matrix
+from adafruit_is31fl3731 import Matrix, CharlieBonnet, CharlieWing
 
 
 DEBUG = True
@@ -19,12 +19,8 @@ else:
     receive_suffix = "her"
     send_suffix = "him"
 
-
-def handle_message(msg):
-    if msg.startswith("acc"):
-        eased_matrix_blink()
-    elif msg.startswith("tap"):
-        easeMatrixBlink()
+current_recvs = 0
+message_lock = threading.Lock()
 
 def send_message(tapped, accel):
     response = sqs.send_message(
@@ -32,22 +28,27 @@ def send_message(tapped, accel):
         DelaySeconds=0,
         MessageAttributes={
             'Tapped': {
-                'DataType': 'Binary',
-                'BinaryValue': int(tapped == True),
+                'DataType': 'String',
+                'StringValue': str(tapped),
             },
-            'Acceleration': {
-                'NumberListValues': [
-                    accel.x,
-                    accel.y,
-                    accel.z,
-                ]
+            'x': {
+                'DataType': 'Number',
+                'StringValue': str(accel[0])
+            },
+            'y': {
+                'DataType': 'Number',
+                'StringValue': str(accel[1])
+            },
+            'z': {
+                'DataType': 'Number',
+                'StringValue': str(accel[2])
             }
         },
         MessageBody=(
             "Light information from " + send_suffix
         )
     )
-    print("Sent message:", response['MessageId'])      
+    print("[SEND] Sent message:", response['MessageId'])      
 
 # input is from 0 - 1 representing percentage of animation
 def ease_in_expo(x):
@@ -56,39 +57,43 @@ def ease_in_expo(x):
     else:
         return 2 ** (10 * x - 10)
 
-maxBrightness = 100
-easeStep = 0.05
-def ease_in_matrix(easeFunc):
+max_brightness = 100
+ease_step = 0.05
+ease_wait = 0.05
+def ease_in_matrix(ease_func):
     progress = 0.0
     while progress <= 1:
-        display.fill(maxBrightness * easeFunc(progress))
-        progress += easeStep
+        display.fill(int(max_brightness * ease_func(progress)))
+        progress += ease_step
+        time.sleep(ease_wait)
 
-def ease_out_matrix(easeFunc):
+def ease_out_matrix(ease_func):
     progress = 1.0
     while True:
         if progress <= 0:
             display.fill(0)
             return
-        display.fill(maxBrightness * easeFunc(progress))
-        progress -= easeStep
+        display.fill(int(max_brightness * ease_func(progress)))
+        progress -= ease_step
+        time.sleep(ease_wait)
 
 def eased_matrix_blink():
     ease_in_matrix(ease_in_expo)
     ease_out_matrix(ease_in_expo)
 
 def sending():
-    print("Hello from recving thread.")
+    print("[SEND] Hello!")
     accel_threshold = 10
     while True:
         tapped = msa.tapped
         accel = msa.acceleration
-        if msa.acceleration > accel_threshold:
+        #if sum(accel) > accel_threshold or tapped:
+        if tapped:
             send_message(tapped, accel)
-            time.sleep(1) # delay for placing back down, maybe better way to do this
 
 def recving():
-    print("Hello from recving thread.")
+    print("[RECV] Hello!")
+    global current_recvs
     while True:
         response = sqs.receive_message(
             QueueUrl=receive_url,
@@ -104,17 +109,45 @@ def recving():
         )
 
         if 'Messages' in response:
+            print("[RECV] Got message, handling...")
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
-
-            handle_message(message)
-
-            sqs.delete_message(
-                    QueueUrl=receieve_url,
+            if bool(message['MessageAttributes']['Tapped']['StringValue']):
+                print("[RECV] Got trigger from message, incrementing counter")
+                #message_lock.acquire()
+                current_recvs += 1
+                #message_lock.release()
+            else:
+                print("[RECV] Did not receive trigger")
+            print("[RECV] Deleting recv message from queue...")
+            delete = sqs.delete_message(
+                    QueueUrl=receive_url,
                     ReceiptHandle = receipt_handle
             )
 
+def lighting():
+    print("[LGHT] Hello!")
+    global current_recvs
+    while True:
+        if current_recvs > 0:
+            print("[LGHT] Handling new message, acqr lock")
+            #message_lock.acquire()
+            print("[LGHT] Blinking")
+            eased_matrix_blink()
+            print("[LGHT] Decrementing")
+            current_recvs -= 1
+            #message_lock.release()
+            print("[LGHT] Released lock")
+   
+def setup_awscli_vars():
+    os.environ["AWS_ACCESS_KEY_ID"] = awsconfig.id
+    os.environ["AWS_SECRET_ACCESS_KEY"] = awsconfig.key
+    os.environ["AWS_DEFAULT_REGION"] = awsconfig.region
+
+
 if __name__ == "__main__":
+    setup_awscli_vars()
+
     # setup aws sqs
     sqs = boto3.client('sqs')
     base_sqs_url = "https://sqs.us-west-1.amazonaws.com/197553793325/light_"
@@ -123,16 +156,19 @@ if __name__ == "__main__":
 
     # setup bus devices
     i2c = busio.I2C(board.SCL, board.SDA)
-    display = Matrix(i2c)
-    #msa = MSA301(i2c)
-    #msa.enable_tap_detection()
-
+    display = CharlieBonnet(i2c)
+    msa = MSA301(i2c)
+    msa.enable_tap_detection()
+    eased_matrix_blink()
     # setup threads
     send_thread = threading.Thread(target=sending)
     recv_thread = threading.Thread(target=recving)
+    lighting_thread = threading.Thread(target=lighting)
 
-    #send_thread.start()
+    send_thread.start()
     recv_thread.start()
+    lighting_thread.start()
 
-    #send_thread.join()
+    send_thread.join()
     recv_thread.join()
+    lighting_thread.join()
