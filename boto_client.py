@@ -1,4 +1,4 @@
-import boto3, os, threading
+import boto3, os, threading, multiprocessing
 import awsconfig
 
 import time, board, busio, math
@@ -113,10 +113,8 @@ def recving():
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
             if bool(message['MessageAttributes']['Tapped']['StringValue']):
-                print("[RECV] Got trigger from message, incrementing counter")
-                #message_lock.acquire()
-                current_recvs += 1
-                #message_lock.release()
+                print("[RECV] Got trigger from message")
+                eased_matrix_blink()
             else:
                 print("[RECV] Did not receive trigger")
             print("[RECV] Deleting recv message from queue...")
@@ -125,20 +123,6 @@ def recving():
                     ReceiptHandle = receipt_handle
             )
 
-def lighting():
-    print("[LGHT] Hello!")
-    global current_recvs
-    while True:
-        if current_recvs > 0:
-            print("[LGHT] Handling new message, acqr lock")
-            #message_lock.acquire()
-            print("[LGHT] Blinking")
-            eased_matrix_blink()
-            print("[LGHT] Decrementing")
-            current_recvs -= 1
-            #message_lock.release()
-            print("[LGHT] Released lock")
-   
 def setup_awscli_vars():
     os.environ["AWS_ACCESS_KEY_ID"] = awsconfig.id
     os.environ["AWS_SECRET_ACCESS_KEY"] = awsconfig.key
@@ -146,29 +130,23 @@ def setup_awscli_vars():
 
 
 if __name__ == "__main__":
+    # setup environment vars for awscli
     setup_awscli_vars()
-
     # setup aws sqs
     sqs = boto3.client('sqs')
-    base_sqs_url = "https://sqs.us-west-1.amazonaws.com/197553793325/light_"
+    base_sqs_url = awsconfig.baseurl
     send_url = base_sqs_url + send_suffix
     receive_url = base_sqs_url + receive_suffix
-
     # setup bus devices
     i2c = busio.I2C(board.SCL, board.SDA)
     display = CharlieBonnet(i2c)
     msa = MSA301(i2c)
     msa.enable_tap_detection()
     eased_matrix_blink()
-    # setup threads
-    send_thread = threading.Thread(target=sending)
-    recv_thread = threading.Thread(target=recving)
-    lighting_thread = threading.Thread(target=lighting)
-
-    send_thread.start()
-    recv_thread.start()
-    lighting_thread.start()
-
-    send_thread.join()
-    recv_thread.join()
-    lighting_thread.join()
+    # setup processes
+    send_proc = Process(target=sending)
+    recv_proc = Process(target=recving)
+    send_proc.start()
+    recv_proc.start()
+    send_proc.join()
+    recv_proc.join()
