@@ -1,0 +1,8 @@
+[Unit]
+Description=lights service
+
+[Service]
+ExecStart=/home/pi/lights/venv/bin/python /home/pi/lights/boto_client.py
+
+[Install]
+WantedBy=multi-user.target
