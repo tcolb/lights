@@ -6,8 +6,9 @@ import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
 from adafruit_is31fl3731 import CharlieBonnet
 
+import BonnetPatterns
 
-DEBUG = True
+DEBUG = False
 HIMST = True
 
 if DEBUG:
@@ -19,6 +20,19 @@ elif HIMST:
 else:
     receive_suffix = "her"
     send_suffix = "him"
+
+
+#######
+#
+#   AWS Helpers
+#
+#######
+
+
+def setup_awscli_vars():
+    os.environ["AWS_ACCESS_KEY_ID"] = awsconfig.id
+    os.environ["AWS_SECRET_ACCESS_KEY"] = awsconfig.key
+    os.environ["AWS_DEFAULT_REGION"] = awsconfig.region
 
 def send_message(tapped, accel):
     response = sqs.send_message(
@@ -48,36 +62,71 @@ def send_message(tapped, accel):
     )
     print("[SEND] Sent message:", response['MessageId'])      
 
+
+#######
+#
+#  CharliePlex Bonnet Helpers
+#
+#######
+
+
 # input is from 0 - 1 representing percentage of animation
-def ease_in_expo(x):
+def ease_expo(x):
     if x == 0:
         return 0
     else:
         return 2 ** (10 * x - 10)
 
-max_brightness = 100
+max_brightness = 50
 ease_step = 0.05
 ease_wait = 0.01
-def ease_in_matrix(ease_func):
+
+def generic_ease_in(ease_func, callback):
     progress = 0.0
     while progress <= 1:
-        display.fill(int(max_brightness * ease_func(progress)))
+        callback(int(max_brightness * ease_func(progress)))
         progress += ease_step
         time.sleep(ease_wait)
 
-def ease_out_matrix(ease_func):
+def generic_ease_out(ease_func, callback):
     progress = 1.0
     while True:
         if progress <= 0:
-            display.fill(0)
+            callback(0)
             return
-        display.fill(int(max_brightness * ease_func(progress)))
+        callback(int(max_brightness * ease_func(progress)))
         progress -= ease_step
         time.sleep(ease_wait)
 
+def ease_in_matrix():
+    generic_ease_in(ease_expo, lambda x: display.fill(x))
+
+def ease_out_matrix():
+    generic_ease_out(ease_expo, lambda x: display.fill(x))
+
 def eased_matrix_blink():
-    ease_in_matrix(ease_in_expo)
-    ease_out_matrix(ease_in_expo)
+    ease_in_matrix()
+    ease_out_matrix()
+
+def matrix_pattern_callback(strength, pattern):
+    width = 16
+    height = 8
+    for x in range(width):
+        for y in range(height):
+            if pattern[(y * width) + x] == 1:
+                display.pixel(x, y, strength)
+
+def eased_matrix_pattern_blink(pattern):
+    generic_ease_in(ease_expo, lambda x: matrix_pattern_callback(x, pattern))
+    generic_ease_out(ease_expo, lambda x: matrix_pattern_callback(x, pattern))
+
+
+#######
+#
+#  Child Processes
+#
+#######
+
 
 def sending():
     print("[SEND] Hello!")
@@ -88,6 +137,7 @@ def sending():
         #if sum(accel) > accel_threshold or tapped:
         if tapped:
             send_message(tapped, accel)
+            eased_matrix_pattern_blink(BonnetPatterns.outline)
 
 def recving():
     print("[RECV] Hello!")
@@ -121,10 +171,12 @@ def recving():
                     ReceiptHandle = receipt_handle
             )
 
-def setup_awscli_vars():
-    os.environ["AWS_ACCESS_KEY_ID"] = awsconfig.id
-    os.environ["AWS_SECRET_ACCESS_KEY"] = awsconfig.key
-    os.environ["AWS_DEFAULT_REGION"] = awsconfig.region
+
+#######
+#
+#  Main logic
+#
+#######
 
 
 if __name__ == "__main__":
