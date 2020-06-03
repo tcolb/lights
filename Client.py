@@ -1,11 +1,8 @@
-import boto3, os
+import boto3, os, random, time, board, busio, math
 from multiprocessing import Process
-import awsconfig
-
-import time, board, busio, math
 from adafruit_msa301 import MSA301, TapDuration
 from adafruit_is31fl3731 import CharlieBonnet
-
+import awsconfig
 import BonnetPatterns
 
 DEBUG = False
@@ -162,7 +159,7 @@ def recving():
             receipt_handle = message['ReceiptHandle']
             if bool(message['MessageAttributes']['Tapped']['StringValue']):
                 print("[RECV] Got trigger from message")
-                eased_matrix_blink()
+                eased_matrix_pattern_blink(random.choice(BonnetPatterns.recv_patterns))
             else:
                 print("[RECV] Did not receive trigger")
             print("[RECV] Deleting recv message from queue...")
