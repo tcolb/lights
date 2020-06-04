@@ -184,8 +184,10 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
             print("[RECV] Got message, handling...")
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
-            if 'HealthCheck' in message['MessageAttributes']['HealthCheck']['StringValue'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
+            if 'HealthCheck' in message['MessageAttributes'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
                 print("[RECV] Got a HealthCheck")
+                if not v_HEALTHY.value:
+                    eased_matrix_pattern_blink(BonnetPatterns.happy)
                 v_HEALTHY.value = True 
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
                 if 'ShouldRespond' in message['MessageAttributes'] and message['MessageAttributes']['ShouldRespond']['StringValue'] == "True":
