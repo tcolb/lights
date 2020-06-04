@@ -1,4 +1,4 @@
-import boto3, os, random, time, board, busio, math
+import boto3, os, random, time, board, busio, math, sys
 from multiprocessing import Process, Value
 from adafruit_msa301 import MSA301, TapDuration
 from adafruit_is31fl3731 import CharlieBonnet
@@ -6,16 +6,10 @@ from enum import Enum
 import awsconfig
 import BonnetPatterns
 
-DEBUG = False
-HIMST = True
-
-if DEBUG:
-    receive_suffix = "him"
-    send_suffix = "him"
-elif HIMST:
+if 'him' == sys.argv[1]:
     receive_suffix = "him"
     send_suffix = "her"
-else:
+if 'her' == sys.argv[1]:
     receive_suffix = "her"
     send_suffix = "him"
 
@@ -68,7 +62,7 @@ def send_message(tapped, accel):
             "Light information from " + send_suffix
         )
     )
-    print("[SEND] Sent message:", response['MessageId'])      
+    print("[SEND] Sent message as", send_suffix + ":", response['MessageId'])      
 
 def send_healthcheck():
     response = sqs.send_message(
@@ -84,7 +78,7 @@ def send_healthcheck():
             "Light information from " + send_suffix
         )
     )
-    return " sent healthcheck:" + response['MessageId']
+    return " sent healthcheck as", send_suffix + ":" + response['MessageId']
 
 #######
 #
