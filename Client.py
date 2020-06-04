@@ -164,7 +164,6 @@ def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
 def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
     print("[RECV] Hello!")
 
-    import json
     while True:
         response = sqs.receive_message(
             QueueUrl=receive_url,
@@ -183,7 +182,6 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
 
         if 'Messages' in response:
             print("[RECV] Got message, handling...")
-            print(json.dumps(response, indent=2))
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
             if 'HealthCheck' in message['MessageAttributes']['HealthCheck']['StringValue'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
