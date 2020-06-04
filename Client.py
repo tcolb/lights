@@ -179,13 +179,13 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
             print("[RECV] Got message, handling...")
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
-            if bool(message['MessageAttributes']['HealthCheck']):
+            if 'HealthCheck' in message['MessageAttributes'] and bool(message['MessageAttributes']['HealthCheck']['StringValue']):
                 print("[RECV] Got a HealthCheck")
                 v_HEALTHY.value = True 
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
                 print("[RECV] Response-" + send_healthcheck())
                 v_LAST_SENT_HEALTHCHECK.value = cur_time
-            elif bool(message['MessageAttributes']['Tapped']['StringValue']):
+            elif 'Tapped' in message['MessageAttributes'] and bool(message['MessageAttributes']['Tapped']['StringValue']):
                 print("[RECV] Got trigger from message")
                 v_HEALTHY.value = True
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
