@@ -1,7 +1,8 @@
 import boto3, os, random, time, board, busio, math
-from multiprocessing import Process
+from multiprocessing import Process, Value
 from adafruit_msa301 import MSA301, TapDuration
 from adafruit_is31fl3731 import CharlieBonnet
+from enum import Enum
 import awsconfig
 import BonnetPatterns
 
@@ -17,6 +18,12 @@ elif HIMST:
 else:
     receive_suffix = "her"
     send_suffix = "him"
+
+HEALTHCHECK_THRESHOLD = 600
+HEALTHCHECK_SEND_PERIOD = 300
+MAX_BRIGHTNESS = 50
+EASE_STEP = 0.05
+EASE_WAIT = 0.01
 
 
 #######
@@ -51,6 +58,10 @@ def send_message(tapped, accel):
             'z': {
                 'DataType': 'Number',
                 'StringValue': str(accel[2])
+            },
+            'HealthCheck': {
+                'DataType': 'String',
+                'StringValue': str(False),
             }
         },
         MessageBody=(
@@ -59,6 +70,21 @@ def send_message(tapped, accel):
     )
     print("[SEND] Sent message:", response['MessageId'])      
 
+def send_healthcheck():
+    response = sqs.send_message(
+        QueueUrl=send_url,
+        DelaySeconds=0,
+        MessageAttributes={
+            'HealthCheck': {
+                'DataType': 'String',
+                'StringValue': str(True),
+            }
+        },
+        MessageBody=(
+            "Light information from " + send_suffix
+        )
+    )
+    return " sent healthcheck:" + response['MessageId']
 
 #######
 #
@@ -74,16 +100,12 @@ def ease_expo(x):
     else:
         return 2 ** (10 * x - 10)
 
-max_brightness = 50
-ease_step = 0.05
-ease_wait = 0.01
-
 def generic_ease_in(ease_func, callback):
     progress = 0.0
     while progress <= 1:
-        callback(int(max_brightness * ease_func(progress)))
-        progress += ease_step
-        time.sleep(ease_wait)
+        callback(int(MAX_BRIGHTNESS * ease_func(progress)))
+        progress += EASE_STEP
+        time.sleep(EASE_WAIT)
 
 def generic_ease_out(ease_func, callback):
     progress = 1.0
@@ -91,9 +113,9 @@ def generic_ease_out(ease_func, callback):
         if progress <= 0:
             callback(0)
             return
-        callback(int(max_brightness * ease_func(progress)))
-        progress -= ease_step
-        time.sleep(ease_wait)
+        callback(int(MAX_BRIGHTNESS * ease_func(progress)))
+        progress -= EASE_STEP
+        time.sleep(EASE_WAIT)
 
 def ease_in_matrix():
     generic_ease_in(ease_expo, lambda x: display.fill(x))
@@ -125,20 +147,24 @@ def eased_matrix_pattern_blink(pattern):
 #######
 
 
-def sending():
+def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
     print("[SEND] Hello!")
-    accel_threshold = 10
+    print("[SEND] Initial-" + send_healthcheck())
+    v_LAST_SENT_HEALTHCHECK.value = time.monotonic()
     while True:
+        cur_time = time.monotonic()
+        if v_HEALTHY.value and v_LAST_SENT_HEALTHCHECK.value + HEALTHCHECK_SEND_PERIOD < cur_time:
+            print("[SEND] Schedule-" + send_healthcheck())
+            v_LAST_SENT_HEALTHCHECK.value = cur_time
+
         tapped = msa.tapped
         accel = msa.acceleration
-        #if sum(accel) > accel_threshold or tapped:
         if tapped:
             send_message(tapped, accel)
             eased_matrix_pattern_blink(BonnetPatterns.outline)
 
-def recving():
+def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
     print("[RECV] Hello!")
-    global current_recvs
     while True:
         response = sqs.receive_message(
             QueueUrl=receive_url,
@@ -153,20 +179,36 @@ def recving():
             WaitTimeSeconds=0
         )
 
+        cur_time = time.monotonic()
+
         if 'Messages' in response:
             print("[RECV] Got message, handling...")
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
-            if bool(message['MessageAttributes']['Tapped']['StringValue']):
+            if bool(message['MessageAttributes']['HealthCheck']):
+                print("[RECV] Got a HealthCheck")
+                v_HEALTHY.value = True 
+                v_LAST_RECV_HEALTHCHECK.value = cur_time
+                print("[RECV] Response-" + send_healthcheck())
+                v_LAST_SENT_HEALTHCHECK.value = cur_time
+            elif bool(message['MessageAttributes']['Tapped']['StringValue']):
                 print("[RECV] Got trigger from message")
+                v_HEALTHY.value = True
+                v_LAST_RECV_HEALTHCHECK.value = cur_time
                 eased_matrix_pattern_blink(random.choice(BonnetPatterns.recv_patterns))
             else:
-                print("[RECV] Did not receive trigger")
+                print("[RECV] Received malformed message :/")
             print("[RECV] Deleting recv message from queue...")
             delete = sqs.delete_message(
                     QueueUrl=receive_url,
                     ReceiptHandle = receipt_handle
             )
+
+        if v_LAST_RECV_HEALTHCHECK.value + HEALTHCHECK_THRESHOLD < cur_time:
+            v_HEALTHY.value = False
+
+        if not v_HEALTHY.value:
+            eased_matrix_pattern_blink(BonnetPatterns.sad)
 
 
 #######
@@ -190,9 +232,12 @@ if __name__ == "__main__":
     msa = MSA301(i2c)
     msa.enable_tap_detection()
     eased_matrix_blink()
-    # setup processes
-    send_proc = Process(target=sending)
-    recv_proc = Process(target=recving)
+    # setup multi processing
+    HEALTH = Value('b', False)
+    LAST_RECV_HEALTHCHECK = Value('d', 0)
+    LAST_SENT_HEALTHCHECK = Value('d', 0)
+    send_proc = Process(target=sending, args=(HEALTH, LAST_SENT_HEALTHCHECK))
+    recv_proc = Process(target=recving, args=(HEALTH, LAST_RECV_HEALTHCHECK, LAST_SENT_HEALTHCHECK))
     send_proc.start()
     recv_proc.start()
     send_proc.join()

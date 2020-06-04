@@ -1,6 +1,5 @@
 require 'sinatra'
 require 'json'
-
 require_relative 'webhooksecret'
 
 set :port, 3254
