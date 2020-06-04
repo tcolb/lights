@@ -64,7 +64,7 @@ def send_message(tapped, accel):
     )
     print("[SEND] Sent message as", send_suffix + ":", response['MessageId'])      
 
-def send_healthcheck():
+def send_healthcheck(respond=False):
     response = sqs.send_message(
         QueueUrl=send_url,
         DelaySeconds=0,
@@ -72,7 +72,11 @@ def send_healthcheck():
             'HealthCheck': {
                 'DataType': 'String',
                 'StringValue': str(True),
-            }
+            },
+            'ShouldRespond': {
+                'DataType': 'String',
+                'StringValue': str(respond),
+            },
         },
         MessageBody=(
             "Light information from " + send_suffix
@@ -143,12 +147,12 @@ def eased_matrix_pattern_blink(pattern):
 
 def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
     print("[SEND] Hello!")
-    print("[SEND] Initial-" + send_healthcheck())
+    print("[SEND] Initial-" + send_healthcheck(True))
     v_LAST_SENT_HEALTHCHECK.value = time.monotonic()
     while True:
         cur_time = time.monotonic()
         if v_HEALTHY.value and v_LAST_SENT_HEALTHCHECK.value + HEALTHCHECK_SEND_PERIOD < cur_time:
-            print("[SEND] Schedule-" + send_healthcheck())
+            print("[SEND] Schedule-" + send_healthcheck(True))
             v_LAST_SENT_HEALTHCHECK.value = cur_time
 
         tapped = msa.tapped
@@ -183,8 +187,9 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
                 print("[RECV] Got a HealthCheck")
                 v_HEALTHY.value = True 
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
-                print("[RECV] Response-" + send_healthcheck())
-                v_LAST_SENT_HEALTHCHECK.value = cur_time
+                if 'ShouldRespond' in message['MessageAttributes'] and bool(message['MessageAttributes']['ShouldRespond']['StringValue']):
+                    print("[RECV] Response-" + send_healthcheck())
+                    v_LAST_SENT_HEALTHCHECK.value = cur_time
             elif 'Tapped' in message['MessageAttributes'] and bool(message['MessageAttributes']['Tapped']['StringValue']):
                 print("[RECV] Got trigger from message")
                 v_HEALTHY.value = True
