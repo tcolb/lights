@@ -13,8 +13,8 @@ if 'her' == sys.argv[1]:
     receive_suffix = "her"
     send_suffix = "him"
 
-HEALTHCHECK_THRESHOLD = 20
-HEALTHCHECK_SEND_PERIOD = 10
+HEALTHCHECK_THRESHOLD = 60
+HEALTHCHECK_SEND_PERIOD = 30
 MAX_BRIGHTNESS = 50
 EASE_STEP = 0.05
 EASE_WAIT = 0.01
