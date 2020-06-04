@@ -64,7 +64,7 @@ def send_message(tapped, accel):
     )
     print("[SEND] Sent message as", send_suffix + ":", response['MessageId'])      
 
-def send_healthcheck():
+def send_healthcheck(respond=False):
     response = sqs.send_message(
         QueueUrl=send_url,
         DelaySeconds=0,
@@ -72,7 +72,11 @@ def send_healthcheck():
             'HealthCheck': {
                 'DataType': 'String',
                 'StringValue': str(True),
-            }
+            },
+            'ShouldRespond': {
+                'DataType': 'String',
+                'StringValue': str(response),
+            },
         },
         MessageBody=(
             "Light information from " + send_suffix
@@ -183,8 +187,9 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
                 print("[RECV] Got a HealthCheck")
                 v_HEALTHY.value = True 
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
-                print("[RECV] Response-" + send_healthcheck())
-                v_LAST_SENT_HEALTHCHECK.value = cur_time
+                if 'ShouldRespond' in message['MessageAttributes'] and bool(message['MessageAttributes']['ShouldRespond']['StringValue']):
+                    print("[RECV] Response-" + send_healthcheck())
+                    v_LAST_SENT_HEALTHCHECK.value = cur_time
             elif 'Tapped' in message['MessageAttributes'] and bool(message['MessageAttributes']['Tapped']['StringValue']):
                 print("[RECV] Got trigger from message")
                 v_HEALTHY.value = True
