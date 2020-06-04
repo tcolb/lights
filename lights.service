@@ -1,7 +1,10 @@
 [Unit]
 Description=lights service
+Wants=network-online.target
+After=network.target network-online.target
 
 [Service]
+Type=forking
 ExecStart=sh /home/pi/lights/start.sh
 
 [Install]
