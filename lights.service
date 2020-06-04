@@ -2,7 +2,7 @@
 Description=lights service
 
 [Service]
-ExecStart=/home/pi/lights/venv/bin/python /home/pi/lights/boto_client.py
+ExecStart=/home/pi/lights/venv/bin/python /home/pi/lights/Client.py
 
 [Install]
 WantedBy=multi-user.target

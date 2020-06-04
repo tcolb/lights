@@ -5,6 +5,9 @@ require_relative 'webhooksecret'
 
 set :port, 3254
 
+pid = spawn("autossh -R lights-" + WebhookSecret.identity + ".serveo.net:80:localhost:8888 serveo.net")
+Process.detach(pid)
+
 post '/payload' do
   request.body.rewind
   payload_body = request.body.read
