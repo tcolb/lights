@@ -75,7 +75,7 @@ def send_healthcheck(respond=False):
             },
             'ShouldRespond': {
                 'DataType': 'String',
-                'StringValue': str(response),
+                'StringValue': str(respond),
             },
         },
         MessageBody=(
@@ -147,12 +147,12 @@ def eased_matrix_pattern_blink(pattern):
 
 def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
     print("[SEND] Hello!")
-    print("[SEND] Initial-" + send_healthcheck())
+    print("[SEND] Initial-" + send_healthcheck(True))
     v_LAST_SENT_HEALTHCHECK.value = time.monotonic()
     while True:
         cur_time = time.monotonic()
         if v_HEALTHY.value and v_LAST_SENT_HEALTHCHECK.value + HEALTHCHECK_SEND_PERIOD < cur_time:
-            print("[SEND] Schedule-" + send_healthcheck())
+            print("[SEND] Schedule-" + send_healthcheck(True))
             v_LAST_SENT_HEALTHCHECK.value = cur_time
 
         tapped = msa.tapped
