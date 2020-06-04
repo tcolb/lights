@@ -2,7 +2,7 @@
 Description=lights service
 
 [Service]
-ExecStart=/home/pi/lights/venv/bin/python /home/pi/lights/Client.py
+ExecStart=sh /home/pi/lights/start.sh
 
 [Install]
 WantedBy=multi-user.target
