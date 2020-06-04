@@ -230,6 +230,10 @@ if __name__ == "__main__":
     msa = MSA301(i2c)
     msa.enable_tap_detection()
     eased_matrix_blink()
+
+    print("Send url: " + send_url)
+    print("Recv url: " + receive_url)
+
     # setup multi processing
     HEALTH = Value('b', False)
     LAST_RECV_HEALTHCHECK = Value('d', 0)
