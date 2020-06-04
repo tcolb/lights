@@ -55,7 +55,7 @@ def send_message(tapped, accel):
             },
             'HealthCheck': {
                 'DataType': 'String',
-                'StringValue': str(False),
+                'StringValue': 'True',
             }
         },
         MessageBody=(
@@ -163,6 +163,8 @@ def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
 
 def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
     print("[RECV] Hello!")
+
+    import json
     while True:
         response = sqs.receive_message(
             QueueUrl=receive_url,
@@ -181,22 +183,19 @@ def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
 
         if 'Messages' in response:
             print("[RECV] Got message, handling...")
+            print(json.dumps(response, indent=2))
             message = response['Messages'][0]
             receipt_handle = message['ReceiptHandle']
-            if 'HealthCheck' in message['MessageAttributes'] and bool(message['MessageAttributes']['HealthCheck']['StringValue']):
+            if 'HealthCheck' in message['MessageAttributes']['HealthCheck']['StringValue'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
                 print("[RECV] Got a HealthCheck")
                 v_HEALTHY.value = True 
                 v_LAST_RECV_HEALTHCHECK.value = cur_time
-                if 'ShouldRespond' in message['MessageAttributes'] and bool(message['MessageAttributes']['ShouldRespond']['StringValue']):
+                if 'ShouldRespond' in message['MessageAttributes'] and message['MessageAttributes']['ShouldRespond']['StringValue'] == "True":
                     print("[RECV] Response-" + send_healthcheck())
                     v_LAST_SENT_HEALTHCHECK.value = cur_time
-            elif 'Tapped' in message['MessageAttributes'] and bool(message['MessageAttributes']['Tapped']['StringValue']):
+            if 'Tapped' in message['MessageAttributes'] and message['MessageAttributes']['Tapped']['StringValue'] == "True":
                 print("[RECV] Got trigger from message")
-                v_HEALTHY.value = True
-                v_LAST_RECV_HEALTHCHECK.value = cur_time
                 eased_matrix_pattern_blink(random.choice(BonnetPatterns.recv_patterns))
-            else:
-                print("[RECV] Received malformed message :/")
             print("[RECV] Deleting recv message from queue...")
             delete = sqs.delete_message(
                     QueueUrl=receive_url,
