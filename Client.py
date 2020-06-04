@@ -78,7 +78,7 @@ def send_healthcheck():
             "Light information from " + send_suffix
         )
     )
-    return " sent healthcheck as", send_suffix + ":" + response['MessageId']
+    return "sent healthcheck as" + send_suffix + ":" + response['MessageId']
 
 #######
 #
