@@ -9,7 +9,7 @@ post '/payload' do
   payload_body = request.body.read
   if verify_signature(payload_body)
     puts "Webhook signature matches, spawning update process..."
-    pid = spawn("./update.sh")
+    pid = spawn("/home/pi/lights/update.sh")
     Process.detach(pid) 
   end
 end
