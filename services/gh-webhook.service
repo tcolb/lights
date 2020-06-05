@@ -1,0 +1,15 @@
+[Unit]
+Description=Github webhook for updating lights service
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+User=pi
+Type=forking
+ExecStart=sh /home/pi/lights/start_webhook.sh
+TimeoutSec=0
+RemainAfterExit=yes
+GuessMainPID=no
+
+[Install]
+WantedBy=multi-user.target

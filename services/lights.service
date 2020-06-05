@@ -5,11 +5,7 @@ After=network.target network-online.target
 
 [Service]
 User=pi
-Type=forking
-ExecStart=sh /home/pi/lights/start.sh
-TimeoutSec=0
-RemainAfterExit=yes
-GuessMainPID=no
+ExecStart=/home/pi/lights/venv/bin/python /home/pi/lights/Client.py him
 
 [Install]
 WantedBy=multi-user.target
