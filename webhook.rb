@@ -8,9 +8,9 @@ post '/payload' do
   request.body.rewind
   payload_body = request.body.read
   if verify_signature(payload_body)
-    puts "Webhook signature matches, pulling from git..."
-    puts `git pull`
-    puts `sudo sh update.sh`
+    puts "Webhook signature matches, spawning update process..."
+    pid = spawn("./update.sh")
+    Process.detach(pid) 
   end
 end
 
