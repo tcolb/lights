@@ -7,6 +7,9 @@ After=network.target network-online.target
 User=pi
 Type=forking
 ExecStart=sh /home/pi/lights/start.sh
+TimeoutSec=0
+RemainAfterExit=yes
+GuessMainPID=no
 
 [Install]
 WantedBy=multi-user.target

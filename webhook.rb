@@ -10,6 +10,7 @@ post '/payload' do
   if verify_signature(payload_body)
     puts "Webhook signature matches, pulling from git..."
     puts `git pull`
+    puts `sudo sh update.sh`
   end
 end
 
