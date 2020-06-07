@@ -15,9 +15,9 @@ if 'her' == sys.argv[1]:
 
 HEALTHCHECK_THRESHOLD = 60
 HEALTHCHECK_SEND_PERIOD = 30
-MAX_BRIGHTNESS = 50
-EASE_STEP = 0.05
-EASE_WAIT = 0.01
+MAX_BRIGHTNESS = 40
+EASE_STEP = 0.10
+EASE_WAIT = 0.008
 
 
 #######
@@ -150,63 +150,69 @@ def sending(v_HEALTHY, v_LAST_SENT_HEALTHCHECK):
     print("[SEND] Initial-" + send_healthcheck(True))
     v_LAST_SENT_HEALTHCHECK.value = time.monotonic()
     while True:
-        cur_time = time.monotonic()
-        if v_HEALTHY.value and v_LAST_SENT_HEALTHCHECK.value + HEALTHCHECK_SEND_PERIOD < cur_time:
-            print("[SEND] Schedule-" + send_healthcheck(True))
-            v_LAST_SENT_HEALTHCHECK.value = cur_time
+        try:
+            cur_time = time.monotonic()
+            if v_HEALTHY.value and v_LAST_SENT_HEALTHCHECK.value + HEALTHCHECK_SEND_PERIOD < cur_time:
+                print("[SEND] Schedule-" + send_healthcheck(True))
+                v_LAST_SENT_HEALTHCHECK.value = cur_time
 
-        tapped = msa.tapped
-        accel = msa.acceleration
-        if tapped:
-            send_message(tapped, accel)
-            eased_matrix_pattern_blink(BonnetPatterns.outline)
+            tapped = msa.tapped
+            accel = msa.acceleration
+            if tapped:
+                send_message(tapped, accel)
+                eased_matrix_pattern_blink(BonnetPatterns.outline)
+        except:
+            print("[SEND] Err")
 
 def recving(v_HEALTHY, v_LAST_RECV_HEALTHCHECK, v_LAST_SENT_HEALTHCHECK):
     print("[RECV] Hello!")
 
     while True:
-        response = sqs.receive_message(
-            QueueUrl=receive_url,
-            AttributeNames=[
-                'SentTimestamp'
-            ],
-            MaxNumberOfMessages=1,
-            MessageAttributeNames=[
-                'All'
-            ],
-            VisibilityTimeout=0,
-            WaitTimeSeconds=0
-        )
-
-        cur_time = time.monotonic()
-
-        if 'Messages' in response:
-            print("[RECV] Got message, handling...")
-            message = response['Messages'][0]
-            receipt_handle = message['ReceiptHandle']
-            if 'HealthCheck' in message['MessageAttributes'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
-                print("[RECV] Got a HealthCheck")
-                if not v_HEALTHY.value:
-                    eased_matrix_pattern_blink(BonnetPatterns.happy)
-                v_HEALTHY.value = True 
-                v_LAST_RECV_HEALTHCHECK.value = cur_time
-                if 'ShouldRespond' in message['MessageAttributes'] and message['MessageAttributes']['ShouldRespond']['StringValue'] == "True":
-                    print("[RECV] Response-" + send_healthcheck())
-                    v_LAST_SENT_HEALTHCHECK.value = cur_time
-            if 'Tapped' in message['MessageAttributes'] and message['MessageAttributes']['Tapped']['StringValue'] == "True":
-                print("[RECV] Got trigger from message")
-                eased_matrix_pattern_blink(random.choice(BonnetPatterns.recv_patterns))
-            print("[RECV] Deleting recv message from queue...")
-            delete = sqs.delete_message(
-                    QueueUrl=receive_url,
-                    ReceiptHandle = receipt_handle
+        try:
+            response = sqs.receive_message(
+                QueueUrl=receive_url,
+                AttributeNames=[
+                    'SentTimestamp'
+                ],
+                MaxNumberOfMessages=1,
+                MessageAttributeNames=[
+                    'All'
+                ],
+                VisibilityTimeout=0,
+                WaitTimeSeconds=0
             )
 
-        if v_LAST_RECV_HEALTHCHECK.value + HEALTHCHECK_THRESHOLD < cur_time:
-            v_HEALTHY.value = False
+            cur_time = time.monotonic()
 
-        if not v_HEALTHY.value:
-            eased_matrix_pattern_blink(BonnetPatterns.sad)
+            if 'Messages' in response:
+                print("[RECV] Got message, handling...")
+                message = response['Messages'][0]
+                receipt_handle = message['ReceiptHandle']
+                if 'HealthCheck' in message['MessageAttributes'] and message['MessageAttributes']['HealthCheck']['StringValue'] == "True":
+                    print("[RECV] Got a HealthCheck")
+                    if not v_HEALTHY.value:
+                        eased_matrix_pattern_blink(BonnetPatterns.happy)
+                    v_HEALTHY.value = True 
+                    v_LAST_RECV_HEALTHCHECK.value = cur_time
+                    if 'ShouldRespond' in message['MessageAttributes'] and message['MessageAttributes']['ShouldRespond']['StringValue'] == "True":
+                        print("[RECV] Response-" + send_healthcheck())
+                        v_LAST_SENT_HEALTHCHECK.value = cur_time
+                if 'Tapped' in message['MessageAttributes'] and message['MessageAttributes']['Tapped']['StringValue'] == "True":
+                    print("[RECV] Got trigger from message")
+                    eased_matrix_pattern_blink(random.choice(BonnetPatterns.recv_patterns))
+                print("[RECV] Deleting recv message from queue...")
+                delete = sqs.delete_message(
+                        QueueUrl=receive_url,
+                        ReceiptHandle = receipt_handle
+                )
+
+            if v_LAST_RECV_HEALTHCHECK.value + HEALTHCHECK_THRESHOLD < cur_time:
+                v_HEALTHY.value = False
+
+            if not v_HEALTHY.value:
+                eased_matrix_pattern_blink(BonnetPatterns.sad)
+        except:
+            print("[RECV] Err")
 
 
 #######
